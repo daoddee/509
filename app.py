@@ -3,7 +3,6 @@ from flask_cors import CORS
 import openai
 import os
 from dotenv import load_dotenv
-from flask_caching import Cache  # Import caching
 
 # Load environment variables
 load_dotenv()
@@ -20,10 +19,12 @@ client = openai.OpenAI(api_key=api_key)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for cross-origin requests
 
-# Set up caching
-cache = Cache(app, config={'CACHE_TYPE': 'simple'})  # Simple in-memory cache
+# Test Route (Check if API is Live)
+@app.route("/", methods=['GET'])
+def home():
+    return "✅ Abaqus Chatbot API is running!"
 
-
+# Chat Route
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
@@ -36,14 +37,6 @@ def chat():
 
         # Get the response style from the request, default to "detailed"
         style = data.get("style", "detailed")
-
-        # Generate a cache key based on input and style
-        cache_key = f"{style}_{user_input}"
-
-        # Check if response is already cached
-        cached_response = cache.get(cache_key)
-        if cached_response:
-            return jsonify({"response": cached_response, "cached": True})
 
         # Define system messages based on the selected style
         if style == "simple":
@@ -66,17 +59,14 @@ def chat():
 
         ai_response = response.choices[0].message.content
 
-        # Store response in cache for faster future access
-        cache.set(cache_key, ai_response, timeout=600)  # Cache for 10 minutes
-
-        return jsonify({"response": ai_response, "cached": False})
+        return jsonify({"response": ai_response})
 
     except openai.OpenAIError as e:
         return jsonify({"error": f"OpenAI API error: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": f"Server error: {str(e)}"}), 500
 
-
+# Run Flask App
 if __name__ == '__main__':
     app.run(debug=True)
 
