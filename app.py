@@ -1,96 +1,88 @@
+import os
+import openai
+import hashlib
+import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import openai
-import time
-import hashlib
+from flask_caching import Cache
 
 app = Flask(__name__)
 CORS(app)
 
-# In-memory cache for faster responses
-response_cache = {}
+# ✅ Caching Configuration (Improves Performance)
+app.config["CACHE_TYPE"] = "simple"
+app.cache = Cache(app)
 
-# OpenAI API Client Setup
-client = openai.OpenAI(api_key="YOUR_OPENAI_API_KEY")  # Replace with your API key
-
-# Session-based user context
-user_sessions = {}
+# ✅ Load OpenAI API Key from Environment Variable
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def generate_cache_key(prompt):
-    """Generates a unique cache key for repeated questions."""
+    """Generate a unique cache key for each unique request"""
     return hashlib.md5(prompt.encode()).hexdigest()
 
-def fetch_ai_response(prompt, user_id=None):
-    """
-    Fetches a response from OpenAI with caching and session memory.
-    - Uses cache for common questions.
-    - Remembers user context.
-    """
-    cache_key = generate_cache_key(prompt)
-    
-    # Return cached response if available
-    if cache_key in response_cache:
-        return response_cache[cache_key]
+def fetch_ai_response(prompt, cache_key=None):
+    """Fetch a response from the AI, with caching to improve response time."""
+    if cache_key and app.cache.get(cache_key):
+        return app.cache.get(cache_key)
 
-    # Maintain user conversation history
-    if user_id not in user_sessions:
-        user_sessions[user_id] = []
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an Abaqus expert assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=400,
+            temperature=0.3
+        )
 
-    user_sessions[user_id].append({"role": "user", "content": prompt})
+        ai_response = response["choices"][0]["message"]["content"].strip()
+        if cache_key:
+            app.cache.set(cache_key, ai_response, timeout=600)  # Cache for 10 minutes
 
-    # Limit session history to avoid excessive memory use
-    if len(user_sessions[user_id]) > 5:
-        user_sessions[user_id] = user_sessions[user_id][-5:]
+        return ai_response
 
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are an expert Abaqus assistant."},
-            *user_sessions[user_id]
-        ],
-        max_tokens=400,
-        temperature=0.3
-    )
-
-    ai_response = response.choices[0].message.content.strip()
-    
-    # Cache the response
-    response_cache[cache_key] = ai_response
-    
-    # Store AI response in user session
-    user_sessions[user_id].append({"role": "assistant", "content": ai_response})
-    
-    return ai_response
+    except openai.error.AuthenticationError:
+        return "⚠️ Invalid OpenAI API key. Check your environment variables."
+    except Exception as e:
+        return f"❌ Server error: {str(e)}"
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """
-    Handles chat requests.
-    - Provides structured guidance.
-    - Keeps track of user session.
-    """
+    """Handle chat requests intelligently and efficiently."""
     data = request.get_json()
     user_input = data.get("message", "").strip()
-    user_id = data.get("user_id", str(time.time()))  # Generates unique session ID
 
     if not user_input:
-        return jsonify({"error": "No input provided"}), 400
+        return jsonify({"error": "⚠️ No input provided"}), 400
 
-    # Special prompts for enhanced assistance
-    if "start project plan" in user_input.lower():
-        response = fetch_ai_response("Generate a step-by-step Abaqus simulation plan.", user_id)
-    elif "current step" in user_input.lower():
-        response = fetch_ai_response("Provide the current step of the Abaqus model setup.", user_id)
-    elif "fixed boundary condition" in user_input.lower():
+    # ✅ Understand the context of the user's question
+    if "fixed boundary condition" in user_input.lower():
         response = fetch_ai_response(
-            "Determine the best location for a fixed boundary condition based on model constraints.",
-            user_id
+            "Explain where to place a fixed boundary condition in Abaqus. "
+            "Ask the user for the model details first to provide a better answer.",
+            cache_key="fixed_boundary_condition"
         )
+
+    elif "where is" in user_input.lower():
+        response = fetch_ai_response(
+            f"Provide the location of the tool requested by the user. Keep it short and simple. "
+            f"Then, ask if they need guidance on how to use the tool. Question: {user_input}",
+            cache_key=generate_cache_key(user_input)
+        )
+
+    elif "start project plan" in user_input.lower():
+        response = fetch_ai_response(
+            "The user is designing a structural model. Create a detailed step-by-step plan to guide them "
+            "throughout the process. Ensure they do not miss any steps.",
+            cache_key="project_plan"
+        )
+
     else:
-        response = fetch_ai_response(user_input, user_id)
+        response = fetch_ai_response(user_input, cache_key=generate_cache_key(user_input))
 
     return jsonify({"response": response})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)), debug=True)
 
