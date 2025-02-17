@@ -82,6 +82,6 @@ def chat():
     return jsonify({"response": response})
 
 if __name__ == '__main__':
-    logging.info("🚀 Starting Flask server on Render...")
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)), debug=True)
+    port = int(os.environ.get("PORT", 10000))  # Default to 10000
+    app.run(host='0.0.0.0', port=port, debug=True)
 
