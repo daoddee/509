@@ -1,0 +1,15 @@
+# Ignore the virtual environment
+abaqus_chatbot_env/
+
+# Ignore Python cache files
+__pycache__/
+
+# Ignore system files
+.DS_Store
+
+# Allow tracking of app files
+!.gitignore
+!app.py
+!requirements.txt
+!Procfile
+
