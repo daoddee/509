@@ -4,155 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Abaqus Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            text-align: center;
-            margin: 0;
-            padding: 0;
+        .chat-box::-webkit-scrollbar {
+            width: 6px;
         }
-        .chat-container {
-            width: 80%;
-            max-width: 600px;
-            margin: 30px auto;
-            background: white;
-            padding: 20px;
+        .chat-box::-webkit-scrollbar-thumb {
+            background-color: #888;
             border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
-        }
-        .chat-box {
-            height: 400px;
-            overflow-y: auto;
-            border: 1px solid #ccc;
-            padding: 10px;
-            background: #f9f9f9;
-            display: flex;
-            flex-direction: column;
-        }
-        .chat-input-container {
-            display: flex;
-            margin-top: 10px;
-        }
-        .chat-input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        .send-btn {
-            padding: 10px 15px;
-            background: #007BFF;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 4px;
-            margin-left: 10px;
-        }
-        .send-btn:hover {
-            background: #0056b3;
-        }
-        .message {
-            padding: 10px;
-            margin: 5px;
-            border-radius: 5px;
-            display: inline-block;
-            max-width: 75%;
-            word-wrap: break-word;
-        }
-        .user-message {
-            background-color: #d1e7fd;
-            align-self: flex-end;
-        }
-        .bot-message {
-            background-color: #d4edda;
-            align-self: flex-start;
-        }
-        .typing {
-            font-style: italic;
-            color: gray;
         }
     </style>
 </head>
-<body>
-
-    <h1>Abaqus Chatbot</h1>
-    <div class="chat-container">
-        <div class="chat-box" id="chat-box"></div>
-        <div class="chat-input-container">
-            <input type="text" id="user-input" class="chat-input" placeholder="Ask something...">
-            <button class="send-btn" id="send-btn">Send</button>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-all">
+    
+    <div class="max-w-2xl mx-auto mt-10 p-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg">
+        <h1 class="text-2xl font-bold text-center mb-4">Abaqus Chatbot</h1>
+        
+        <!-- Chat Box -->
+        <div class="chat-box h-96 overflow-y-auto p-4 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700" id="chat-box"></div>
+        
+        <!-- Input & Button -->
+        <div class="flex mt-4">
+            <input type="text" id="user-input" class="w-full p-3 border rounded-md bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600" placeholder="Ask something...">
+            <button class="ml-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-md" id="send-btn">Send</button>
         </div>
     </div>
-
+    
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             document.getElementById("send-btn").addEventListener("click", sendMessage);
             document.getElementById("user-input").addEventListener("keypress", function(event) {
-                if (event.key === "Enter") {
-                    sendMessage();
-                }
+                if (event.key === "Enter") sendMessage();
             });
         });
 
         function sendMessage() {
             let userInput = document.getElementById("user-input").value.trim();
             let chatBox = document.getElementById("chat-box");
-
+            
             if (userInput === "") return;
-
-            // Display user message
-            let userMessage = document.createElement("div");
-            userMessage.className = "message user-message";
-            userMessage.innerText = "You: " + userInput;
-            chatBox.appendChild(userMessage);
-
-            // Show "typing..." animation
-            let typingIndicator = document.createElement("div");
-            typingIndicator.className = "message bot-message typing";
-            typingIndicator.innerText = "Bot is typing...";
-            chatBox.appendChild(typingIndicator);
-
-            // Clear input field
+            
+            appendMessage("You", userInput, "bg-blue-500 text-white ml-auto");
             document.getElementById("user-input").value = "";
-
-            // Scroll to latest message
             chatBox.scrollTop = chatBox.scrollHeight;
-
-            // Send request to chatbot API
+            
             fetch("https://five09.onrender.com/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: userInput })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Server responded with ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                chatBox.removeChild(typingIndicator);
-
-                let botMessage = document.createElement("div");
-                botMessage.className = "message bot-message";
-                botMessage.innerText = "Bot: " + (data.response || "Error: No response from chatbot.");
-                chatBox.appendChild(botMessage);
-
+                appendMessage("Bot", data.response || "Error: No response.", "bg-gray-200 text-gray-900");
                 chatBox.scrollTop = chatBox.scrollHeight;
             })
             .catch(error => {
-                console.error("Fetch error:", error);
-                chatBox.removeChild(typingIndicator);
-
-                let botMessage = document.createElement("div");
-                botMessage.className = "message bot-message";
-                botMessage.innerText = "Error: Unable to reach chatbot.";
-                chatBox.appendChild(botMessage);
+                console.error("Error:", error);
+                appendMessage("Bot", "Error: Unable to reach chatbot.", "bg-red-500 text-white");
             });
         }
+        
+        function appendMessage(sender, text, classes) {
+            let chatBox = document.getElementById("chat-box");
+            let message = document.createElement("div");
+            message.className = `p-3 my-2 rounded-md max-w-xs ${classes}`;
+            message.innerText = `${sender}: ${text}`;
+            chatBox.appendChild(message);
+        }
     </script>
-
 </body>
 </html>
 
