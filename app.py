@@ -9,24 +9,25 @@ response_cache = {}
 
 def fetch_ai_response(prompt, cache_key=None):
     """
-    Fetch a response from the AI. Check the cache first; if not found,
-    query the AI model.
+    Fetch a response from the AI model. Uses a cache for previously seen prompts.
     """
+    # Check if response is already in the cache
     if cache_key and cache_key in response_cache:
         return response_cache[cache_key]
 
+    # Query the AI model
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": "You are an Abaqus expert assistant that always begins by thoroughly understanding the user's project goals. You create a step-by-step plan to guide the user through their design, ensuring nothing is overlooked."},
+            {"role": "system", "content": "You are an Abaqus expert assistant."},
             {"role": "user", "content": prompt}
         ],
         max_tokens=400,
         temperature=0.3
     )
 
+    # Extract and cache the AI response
     ai_response = response['choices'][0]['message']['content'].strip()
-
     if cache_key:
         response_cache[cache_key] = ai_response
 
@@ -35,8 +36,7 @@ def fetch_ai_response(prompt, cache_key=None):
 @app.route('/chat', methods=['POST'])
 def chat():
     """
-    Handle chat requests. The bot first determines the user's goal,
-    then provides a structured plan.
+    Handle incoming chat requests. Analyzes user input and returns a structured response.
     """
     data = request.get_json()
     user_input = data.get("message", "").strip()
@@ -44,14 +44,15 @@ def chat():
     if not user_input:
         return jsonify({"error": "No input provided"}), 400
 
+    # Check for specific keywords to tailor the response
     if "start project plan" in user_input.lower():
         response = fetch_ai_response(
-            "The user is designing a structural model. Develop a step-by-step plan to ensure the user doesn’t miss any critical steps and sticks to the plan throughout the project.",
+            "The user is designing a structural model. Develop a step-by-step plan.",
             cache_key="project_plan"
         )
     elif "current step" in user_input.lower():
         response = fetch_ai_response(
-            "Provide the current step of the project and the next immediate action the user should take. Include brief guidance if necessary."
+            "Provide the current step of the project and the next immediate action."
         )
     else:
         response = fetch_ai_response(user_input)
