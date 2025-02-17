@@ -9,57 +9,68 @@
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
             text-align: center;
-            margin: 20px;
+            margin: 0;
+            padding: 0;
         }
         .chat-container {
-            width: 50%;
-            margin: auto;
+            width: 80%;
+            max-width: 600px;
+            margin: 30px auto;
             background: white;
             padding: 20px;
-            border-radius: 8px;
+            border-radius: 10px;
             box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
         }
         .chat-box {
-            height: 300px;
+            height: 400px;
             overflow-y: auto;
             border: 1px solid #ccc;
             padding: 10px;
             background: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-input-container {
+            display: flex;
+            margin-top: 10px;
         }
         .chat-input {
-            width: 75%;
+            flex: 1;
             padding: 10px;
-            margin-top: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
         .send-btn {
-            padding: 10px;
+            padding: 10px 15px;
             background: #007BFF;
             color: white;
             border: none;
             cursor: pointer;
             border-radius: 4px;
+            margin-left: 10px;
         }
         .send-btn:hover {
             background: #0056b3;
         }
         .message {
-            padding: 8px;
+            padding: 10px;
             margin: 5px;
             border-radius: 5px;
-            display: block;
-            max-width: 80%;
+            display: inline-block;
+            max-width: 75%;
+            word-wrap: break-word;
         }
         .user-message {
             background-color: #d1e7fd;
-            text-align: right;
-            margin-left: auto;
+            align-self: flex-end;
         }
         .bot-message {
             background-color: #d4edda;
-            text-align: left;
-            margin-right: auto;
+            align-self: flex-start;
+        }
+        .typing {
+            font-style: italic;
+            color: gray;
         }
     </style>
 </head>
@@ -68,22 +79,17 @@
     <h1>Abaqus Chatbot</h1>
     <div class="chat-container">
         <div class="chat-box" id="chat-box"></div>
-        <input type="text" id="user-input" class="chat-input" placeholder="Ask something...">
-        <button class="send-btn" id="send-btn">Send</button>
+        <div class="chat-input-container">
+            <input type="text" id="user-input" class="chat-input" placeholder="Ask something...">
+            <button class="send-btn" id="send-btn">Send</button>
+        </div>
     </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            console.log("🚀 Chatbot Loaded!");
-
-            document.getElementById("send-btn").addEventListener("click", function () {
-                console.log("📩 Send button clicked!");
-                sendMessage();
-            });
-
+            document.getElementById("send-btn").addEventListener("click", sendMessage);
             document.getElementById("user-input").addEventListener("keypress", function(event) {
                 if (event.key === "Enter") {
-                    console.log("🔄 Enter key pressed! Sending message...");
                     sendMessage();
                 }
             });
@@ -93,12 +99,7 @@
             let userInput = document.getElementById("user-input").value.trim();
             let chatBox = document.getElementById("chat-box");
 
-            if (userInput === "") {
-                console.log("⚠️ Empty input, not sending.");
-                return;
-            }
-
-            console.log("✅ User input:", userInput);
+            if (userInput === "") return;
 
             // Display user message
             let userMessage = document.createElement("div");
@@ -106,14 +107,19 @@
             userMessage.innerText = "You: " + userInput;
             chatBox.appendChild(userMessage);
 
+            // Show "typing..." animation
+            let typingIndicator = document.createElement("div");
+            typingIndicator.className = "message bot-message typing";
+            typingIndicator.innerText = "Bot is typing...";
+            chatBox.appendChild(typingIndicator);
+
             // Clear input field
             document.getElementById("user-input").value = "";
 
             // Scroll to latest message
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            console.log("🔗 Sending request to backend...");
-
+            // Send request to chatbot API
             fetch("https://five09.onrender.com/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -121,23 +127,24 @@
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Server Error: ${response.status}`);
+                    throw new Error(`Server responded with ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
-                console.log("✅ Response from chatbot:", data);
+                chatBox.removeChild(typingIndicator);
 
                 let botMessage = document.createElement("div");
                 botMessage.className = "message bot-message";
                 botMessage.innerText = "Bot: " + (data.response || "Error: No response from chatbot.");
                 chatBox.appendChild(botMessage);
 
-                // Scroll to latest message
                 chatBox.scrollTop = chatBox.scrollHeight;
             })
             .catch(error => {
-                console.error("❌ Fetch Error:", error);
+                console.error("Fetch error:", error);
+                chatBox.removeChild(typingIndicator);
+
                 let botMessage = document.createElement("div");
                 botMessage.className = "message bot-message";
                 botMessage.innerText = "Error: Unable to reach chatbot.";
