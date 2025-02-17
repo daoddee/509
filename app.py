@@ -16,15 +16,19 @@ def fetch_ai_response(prompt, cache_key=None):
         return response_cache[cache_key]
 
     # Query the AI model
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are an Abaqus expert assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=400,
-        temperature=0.3
-    )
+import openai
+
+client = openai.OpenAI(api_key="YOUR_OPENAI_API_KEY")  # Replace with your API key
+
+response = client.chat.completions.create(
+    model="gpt-4",
+    messages=[
+        {"role": "system", "content": "You are an Abaqus expert assistant."},
+        {"role": "user", "content": prompt}
+    ],
+    max_tokens=400,
+    temperature=0.3
+)
 
     # Extract and cache the AI response
     ai_response = response['choices'][0]['message']['content'].strip()
