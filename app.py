@@ -27,39 +27,7 @@ def serve_index():
 def serve_static(path):
     return send_from_directory("static", path)
 
-# ✅ Generate AI Prompt Based on User Query
-def generate_prompt(user_input):
-    """
-    ✅ Generates structured responses for Abaqus-related queries, including Python scripts.
-    """
-    if "fixed boundary condition" in user_input:
-        return (
-            "The user wants to apply a fixed boundary condition in Abaqus. "
-            "Ask them to specify the model type (Beam, Shell, or Solid) before providing instructions."
-        )
-
-    elif "mesh settings" in user_input:
-        return (
-            "The user is asking about Abaqus meshing. "
-            "Explain how different element types (tetrahedral, hexahedral) affect results."
-        )
-
-    elif "error" in user_input:
-        return (
-            "The user encountered an error in Abaqus. "
-            "Guide them to check the Job Log and provide possible solutions."
-        )
-
-    elif "generate python script" in user_input or "write python script" in user_input:
-        return (
-            "The user wants a Python script for Abaqus. "
-            "Provide a clean Python script in the response."
-        )
-
-    else:
-        return f"The user asked: {user_input}. Provide a structured answer."
-
-# ✅ AI Chatbot Endpoint with Caching and Python Script Generation
+# ✅ AI Chatbot Endpoint with Caching
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json()
@@ -76,24 +44,47 @@ def chat():
         print("🟢 Returning cached response!")
         return jsonify({"response": cached_response})
 
+    # ✅ Decision Making for Abaqus Script Generation
+    abaqus_scripts = {
+        "fixed boundary condition": """
+from abaqus import *
+from abaqusConstants import *
+from caeModules import *
+
+mdb.models['Model-1'].parts['Part-1'].Set(name='FixedSet', faces=mdb.models['Model-1'].parts['Part-1'].faces.findAt(((0.0, 0.0, 0.0),)))
+mdb.models['Model-1'].rootAssembly.Set(name='FixedSet', faces=mdb.models['Model-1'].rootAssembly.instances['Part-1-1'].faces.findAt(((0.0, 0.0, 0.0),)))
+mdb.models['Model-1'].boundaryConditions['BC-1'] = mdb.models['Model-1'].StaticStep(name='Step-1', previous='Initial').DisplacementBC(name='BC-1', createStepName='Step-1', region=mdb.models['Model-1'].rootAssembly.sets['FixedSet'], u1=0.0, u2=0.0, u3=0.0, ur1=0.0, ur2=0.0, ur3=0.0, amplitude=UNSET, fixed=OFF, distributionType=UNIFORM, fieldName='', localCsys=None)
+""",
+        "apply load": """
+from abaqus import *
+from abaqusConstants import *
+from caeModules import *
+
+mdb.models['Model-1'].rootAssembly.Set(name='LoadSet', faces=mdb.models['Model-1'].rootAssembly.instances['Part-1-1'].faces.findAt(((5.0, 0.0, 0.0),)))
+mdb.models['Model-1'].loads['Load-1'] = mdb.models['Model-1'].StaticStep(name='Step-1', previous='Initial').ConcentratedForce(name='Load-1', createStepName='Step-1', region=mdb.models['Model-1'].rootAssembly.sets['LoadSet'], cf1=-100.0, amplitude=UNSET)
+""",
+    }
+
+    # ✅ Detect if user asks for an Abaqus script
+    for key in abaqus_scripts.keys():
+        if key in user_input.lower():
+            bot_response = f"Here is the Abaqus Python script for {key}:\n```python\n{abaqus_scripts[key]}\n```"
+            cache.set(cache_key, bot_response, timeout=600)  # Cache for 10 minutes
+            return jsonify({"response": bot_response})
+
     try:
-        prompt = generate_prompt(user_input)
-        
+        # ✅ Request AI Response from OpenAI
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are an expert in Abaqus simulation and Python scripting."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You are an expert in Abaqus simulation."},
+                {"role": "user", "content": user_input}
             ],
-            max_tokens=400,
+            max_tokens=300,
             temperature=0.3
         )
 
         bot_response = response.choices[0].message.content.strip()
-
-        # ✅ Format Python Code Properly
-        if "Python script" in bot_response or "import" in bot_response:
-            bot_response = f"```python\n{bot_response}\n```"
 
         # ✅ Cache the response for faster future requests
         cache.set(cache_key, bot_response, timeout=600)  # Cache for 10 minutes
