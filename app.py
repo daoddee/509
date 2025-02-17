@@ -1,24 +1,23 @@
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 import openai
 import os
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 
-app = Flask(__name__)
-CORS(app)
+# Initialize Flask app
+app = Flask(__name__, static_folder="static", template_folder="templates")
+CORS(app)  # Enable CORS
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
+# Simulated caching dictionary
 response_cache = {}
 
-def fetch_ai_response(prompt, cache_key=None):
-    """
-    Fetch a response from the AI. Check the cache first; if not found,
-    query the AI model.
-    """
-    if cache_key and cache_key in response_cache:
-        return response_cache[cache_key]
+# Function to fetch AI response
+def fetch_ai_response(prompt):
+    """Fetch response from AI model with caching for performance."""
+    if prompt in response_cache:
+        return response_cache[prompt]  # Return cached response
 
-    client = openai.OpenAI(api_key=openai.api_key)  # ✅ Use the new API format
+    # OpenAI API call (Ensure OpenAI API key is set as environment variable)
+    client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     response = client.chat.completions.create(
         model="gpt-4",
@@ -30,37 +29,32 @@ def fetch_ai_response(prompt, cache_key=None):
         temperature=0.3
     )
 
-    ai_response = response.choices[0].message.content.strip()  # ✅ FIX INDENTATION
-
-    if cache_key:
-        response_cache[cache_key] = ai_response
-
+    # Extract and store response in cache
+    ai_response = response.choices[0].message.content.strip()
+    response_cache[prompt] = ai_response
     return ai_response
 
+# Homepage Route (Fixes "Not Found" issue)
+@app.route('/')
+def home():
+    return render_template('index.html')  # Serves the frontend HTML page
+
+# Chatbot API Route (Handles POST requests)
 @app.route('/chat', methods=['POST'])
 def chat():
-    """
-    Handle chat requests. The bot first determines the user's goal,   
-    then provides a structured plan.
-    """
+    """Chat endpoint for AI interaction."""
     data = request.get_json()
     user_input = data.get("message", "").strip()
 
     if not user_input:
         return jsonify({"error": "No input provided"}), 400
 
-    if "start project plan" in user_input.lower():
-        response = fetch_ai_response("The user is designing a structural model. Develop a step-by-step plan.", cache_key="project_plan")
-    elif "current step" in user_input.lower():
-        response = fetch_ai_response("Provide the current step of the project and the next immediate action.")
-    else:
-        response = fetch_ai_response(user_input)
-
+    # Process AI response
+    response = fetch_ai_response(user_input)
     return jsonify({"response": response})
 
-import os
-
+# Run the Flask app
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))  # Default to 10000 on Render
-    app.run(debug=True, host='0.0.0.0', port=port)
+    port = int(os.environ.get("PORT", 10000))  # Get port dynamically
+    app.run(host='0.0.0.0', port=port, debug=True)
 
