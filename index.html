@@ -115,15 +115,16 @@
             console.log("🔗 Sending request to backend...");
 
             fetch("https://five09.onrender.com/chat", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    message: userInput,
-                    style: "detailed"
-                })
-            })
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+        message: userInput,  // User input message
+        style: "detailed"
+    })
+})
+
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Server responded with ${response.status}`);
