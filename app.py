@@ -58,6 +58,9 @@ def chat():
 
     return jsonify({"response": response})
 
+import os
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))  # Default to 10000 on Render
+    app.run(debug=True, host='0.0.0.0', port=port)
 
